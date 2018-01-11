@@ -9,6 +9,8 @@ use WHMCS\Input\Sanitize;
 use WHMCS\Service\Addon;
 use WHMCS\Service\Service;
 
+define("NEW_PASSWORD_LENGTH", 20);
+
 function plesk_MetaData() {
     return array(
         'DisplayName' => 'Plesk',
@@ -133,6 +135,19 @@ function plesk_ClientArea($params) {
  * @return string
  */
 function plesk_CreateAccount($params) {
+  
+    if ( strlen($params['password']) <= NEW_PASSWORD_LENGTH ){
+      
+      $newPassword = plesk_RandomPassword(NEW_PASSWORD_LENGTH);
+      
+      //Change password saved in WHMCS for product
+      $values["serviceid"] = $params['serviceid'];
+      $values["servicepassword"] = $newPassword;
+      $results = localAPI("updateclientproduct",$values);
+      
+      $params['password'] = $newPassword;
+      
+    }
 
     try {
 
@@ -667,4 +682,35 @@ function plesk_CreateFileWithinDocRoot(array $params)
     if (!$upload) {
         throw new Exception('Plesk: Unable to create DV Auth File: Unable to Upload File: ' . json_encode(error_get_last()));
     }
+}
+                                
+                                
+/**
+ * Pseudorandom password generator
+ */
+
+function plesk_RandomPassword($size = 8) {
+
+    $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^*?_~';
+		$symbols = '!@#$%^*?_~';
+
+    $pass = array(); //remember to declare $pass as an array
+    $alphaLength = strlen($alphabet) - 1; //put the length -1 in cache
+    for ($i = 0; $i < $size; $i++) {
+        $n = plesk_random_int(0, $alphaLength);
+        $pass[] = $alphabet[$n];
+    }
+		if ( empty( preg_grep('/[!@#\$%\^&\*\?_~]/', $pass) ) ){ // If no symbols. Add 2
+				$pass[plesk_random_int(0, $alphaLength)] = $symbols[plesk_random_int(0, strlen($symbols) - 1)];
+				$pass[plesk_random_int(0, $alphaLength)] = $symbols[plesk_random_int(0, strlen($symbols) - 1)];
+		}
+    return implode($pass); 
+
+}
+
+/* 
+ * random_int with fallback to PHP 5's not crypto secure mt_rand.
+ */
+function plesk_random_int($min, $max){
+  return function_exists('random_int') ? random_int($min, $max) : mt_rand($min, $max);
 }
